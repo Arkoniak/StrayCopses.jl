@@ -1,6 +1,7 @@
 module StrayCopses
 
 using StatsBase
+using Random
 
 include("impurity.jl")
 include("decision_tree.jl")

@@ -115,8 +115,8 @@ end
 # Node functions
 ###############################
 
-function process_node(dtc::DecisionTreeContainer{T}, node, X, target,
-        features = sample(1:size(X, 2), dtc.n_features_per_node, replace = false),
+function process_node(dtc::DecisionTreeContainer{T}, node, X, target, rng = Random.GLOBAL_RNG,
+        features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false),
         depth = 1) where T
     if depth > dtc.max_depth
         node.is_terminal = true
@@ -136,9 +136,9 @@ function process_node(dtc::DecisionTreeContainer{T}, node, X, target,
         right = Node{T}()
         node.left = left
         node.right = right
-        new_features = sample(1:size(X, 2), dtc.n_features_per_node, replace = false)
-        process_node(dtc, left, X[left_ids, :], target[left_ids], new_features, depth + 1)
-        process_node(dtc, right, X[right_ids, :], target[right_ids], new_features, depth + 1)
+        new_features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false)
+        process_node(dtc, left, X[left_ids, :], target[left_ids], rng, new_features, depth + 1)
+        process_node(dtc, right, X[right_ids, :], target[right_ids], rng, new_features, depth + 1)
     end
 end
 
@@ -160,6 +160,8 @@ function Base.:show(io::IO, node::Node, prefix = "")
             new_prefix = collect(prefix)
             new_prefix[end] = '↳'
             new_prefix = join(new_prefix)
+        else
+            new_prefix = prefix
         end
         write(io, new_prefix, "[$(node.value)]", "\n")
     elseif !isdefined(node, :left)

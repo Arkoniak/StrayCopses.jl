@@ -1,17 +1,16 @@
-using Documenter, StrayCopse
+using Documenter, StrayCopses
 
 makedocs(;
-    modules=[StrayCopse],
+    modules=[StrayCopses],
     format=Documenter.HTML(),
     pages=[
         "Home" => "index.md",
     ],
-    repo="https://github.com/Arkoniak/StrayCopse.jl/blob/{commit}{path}#L{line}",
-    sitename="StrayCopse.jl",
-    authors="Andrey Oskin",
-    assets=String[],
+    repo="https://github.com/Arkoniak/StrayCopses.jl/blob/{commit}{path}#L{line}",
+    sitename="StrayCopses.jl",
+    authors="Andrey Oskin"
 )
 
 deploydocs(;
-    repo="github.com/Arkoniak/StrayCopse.jl",
+    repo="github.com/Arkoniak/StrayCopses.jl",
 )

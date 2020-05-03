@@ -6,9 +6,14 @@ struct StrayCopseResult{T, S}
     d::Vector{S}
 end
 
-function fit(::StrayCopse, X, y; max_depth = 6, min_node_records = 1,
+function fit(::StrayCopse, X, y, rng = Random.GLOBAL_RNG; max_depth = 6, min_node_records = 1,
         n_features_per_node = Int(floor(sqrt(size(X, 2)))), n_trees = 100,
         encode = true)
+
+    if n_features_per_node > size(X, 2)
+        @warn "n_features_per_node is $n_features_per_node which is larger than the overall features number $(size(X, 2))."
+        n_features_per_node = size(X, 2)
+    end
 
     out_classes = unique(y)
     n_classes = length(out_classes)
@@ -31,7 +36,7 @@ function fit(::StrayCopse, X, y; max_depth = 6, min_node_records = 1,
         X1 = X[ids, :]
         target1 = target[ids]
         dtc = DecisionTreeContainer{T}(root, n_features_per_node, n_classes, max_depth, min_node_records)
-        process_node(dtc, root, X1, target1)
+        process_node(dtc, root, X1, target1, rng)
     end
 
     return StrayCopseResult(sc, encode, out_classes)
