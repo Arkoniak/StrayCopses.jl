@@ -1,7 +1,7 @@
 module TestDecisionTree
 using Test
-using StrayCopse
-using StrayCopse: feature_best_split, best_split
+using StrayCopses
+using StrayCopses: feature_best_split, best_split
 
 @testset "Basic split" begin
     X = reshape([1., 2., 3., 4.], :, 1)

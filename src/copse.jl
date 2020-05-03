@@ -1,4 +1,4 @@
-struct StrayCopseClassifier end
+struct StrayCopse end
 
 struct StrayCopseResult{T, S}
     sc::Vector{Node{T}}

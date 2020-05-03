@@ -1,6 +1,5 @@
 module TestStrayCopse
 using Test
-using SafeTestsets
 
 for file in sort([file for file in readdir(@__DIR__) if
                                    occursin(r"^test[_0-9]+.*\.jl$", file)])

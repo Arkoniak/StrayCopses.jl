@@ -1,8 +1,8 @@
 module TestImpurity
 using Test
-using StrayCopse
-using StrayCopse: node_group_information_gain, node_information_gain, information_gain
-using StrayCopse: node_group_gini_index, node_gini_index, gini_index
+using StrayCopses
+using StrayCopses: node_group_information_gain, node_information_gain, information_gain
+using StrayCopses: node_group_gini_index, node_gini_index, gini_index
 
 @testset "Basic information gain" begin
     @test node_group_information_gain([3, 3]) == 1.0
