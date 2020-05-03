@@ -1,8 +1,8 @@
-# StrayCopse.jl
+# StrayCopses.jl
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [StrayCopse]
+Modules = [StrayCopses]
 ```

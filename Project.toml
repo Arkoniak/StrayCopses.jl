@@ -1,13 +1,19 @@
-name = "StrayCopse"
-uuid = "f2e6ea44-d69d-415c-ab41-3c387429eb9c"
+name = "StrayCopses"
+uuid = "f554f415-119e-4ea0-8d58-ae5601ed402a"
 authors = ["Andrey Oskin"]
 version = "0.1.0"
 
+[deps]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+
 [compat]
+StatsBase = "0.32,0.33"
 julia = "1.3"
 
 [extras]
+StableRNGs = "860ef19b-820b-49d6-a774-d7a799459cd3"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "StableRNGs"]
