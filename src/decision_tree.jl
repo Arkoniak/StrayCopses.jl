@@ -65,32 +65,34 @@ end
 # find best split for given feature
 function feature_best_split(X, target, n_classes, feature)
     best_val = -Inf
-    best_gini = -Inf
+    best_impurity = -Inf
     for i in axes(X, 1)
         left, right = test_split(X, target, n_classes, feature, X[i, feature])
-        gini = gini_index([left, right])
-        if gini > best_gini
-            best_gini = gini
+        impurity = gini_index([left, right])
+        if impurity > best_impurity
+            best_impurity = impurity
             best_val = X[i, feature]
         end
     end
 
-    return best_val
+    return (val = best_val, impurity = best_impurity)
 end
 
 # Chooses best feature from features
 function best_split(X, target, n_classes, features)
     best_feature = 0
     best_val = -Inf
+    best_impurity = -Inf
     for feature in features
-        val = feature_best_split(X, target, n_classes, feature)
-        if val > best_val
+        val, impurity = feature_best_split(X, target, n_classes, feature)
+        if impurity > best_impurity
             best_val = val
             best_feature = feature
+            best_impurity = impurity
         end
     end
 
-    return (best_feature, best_val)
+    return (feature = best_feature, val = best_val)
 end
 
 
@@ -118,6 +120,7 @@ end
 function process_node(dtc::DecisionTreeContainer{T}, node, X, target, rng = Random.GLOBAL_RNG,
         features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false),
         depth = 1) where T
+
     if depth > dtc.max_depth
         node.is_terminal = true
         node.value = split_value(X, target, dtc.n_classes)
@@ -132,6 +135,11 @@ function process_node(dtc::DecisionTreeContainer{T}, node, X, target, rng = Rand
         node.feature_idx = feature_idx
         node.feature_val = feature_val
         left_ids, right_ids = get_split_indices(X, feature_idx, feature_val)
+        # if (size(X) == (2, 4)) & (feature_idx == 1) & (feature_val == 6.5) & (length(left_ids) == 2) & (length(right_ids) == 2)
+        #     @show X, target
+        #     return
+        # end
+        # @show size(X), feature_idx, feature_val, length(left_ids), length(right_ids)
         left = Node{T}()
         right = Node{T}()
         node.left = left
@@ -142,7 +150,7 @@ function process_node(dtc::DecisionTreeContainer{T}, node, X, target, rng = Rand
     end
 end
 
-function predict(node::Node{T}, row) where T
+function predict(node::Node, row)
     if node.is_terminal
         return node.value
     else
@@ -150,6 +158,18 @@ function predict(node::Node{T}, row) where T
             return predict(node.left, row)
         else
             return predict(node.right, row)
+        end
+    end
+end
+
+function predict(node::Node, X, i)
+    if node.is_terminal
+        return node.value
+    else
+        if X[i, node.feature_idx] < node.feature_val
+            return predict(node.left, X, i)
+        else
+            return predict(node.right, X, i)
         end
     end
 end
