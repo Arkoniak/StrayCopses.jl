@@ -43,8 +43,28 @@ function node_gini_index(groups)
     return res
 end
 
+function node_group_gini_index(group, den)
+    den == 0 && return 0.0
+    res = 0.0
+    for x in group
+        res += (x/den)^2
+    end
+    return res
+end
+
+function node_gini_index(left, right, ll, lr, lt)
+    res  = ll/lt * node_group_gini_index(left, ll)
+    res += lr/lt * node_group_gini_index(right, lr)
+
+    return res
+end
+
 function gini_index(groups)
     classes = sum(groups)
     whole_node = node_group_gini_index(classes)
     return whole_node - node_gini_index(groups)
+end
+
+function gini_impurity(gini_before, left, right, ll, lr, lt)
+    return node_gini_index(left, right, ll, lr, lt) - gini_before
 end
