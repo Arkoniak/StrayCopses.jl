@@ -54,18 +54,18 @@ end
 For a given feature and value count number of examples that goes to the left and 
 right branch correspondingly
 """
-function test_split(X, target, n_classes, feature, value)
-    left = zeros(Int, n_classes)
-    right = zeros(Int, n_classes)
-    for i in axes(X, 1)
+function test_split(containers, X, target, n_classes, feature, value)
+    left = containers.left
+    right = containers.right
+    left .= 0
+    right .= 0
+    @inbounds @simd for i in axes(X, 1)
         if X[i, feature] < value
             left[target[i]] += 1
         else
             right[target[i]] += 1
         end
     end
-
-    return left, right
 end
 
 """
@@ -73,12 +73,19 @@ end
 
 For a given feature search best split value.
 """
-function feature_best_split(X, target, n_classes, feature)
+function feature_best_split(containers, X, target, n_classes, feature)
+    gini_before = containers.gini_before
+    left = containers.left
+    right = containers.right
+    lt = containers.lt
+
     best_val = -Inf
     best_impurity = -Inf
-    for i in axes(X, 1)
-        left, right = test_split(X, target, n_classes, feature, X[i, feature])
-        impurity = gini_index([left, right])
+    @inbounds for i in axes(X, 1)
+        test_split(containers, X, target, n_classes, feature, X[i, feature])
+        ll = sum(left)
+        lr = sum(right)
+        impurity = gini_impurity(gini_before, left, right, ll, lr, lt)
         if impurity > best_impurity
             best_impurity = impurity
             best_val = X[i, feature]
@@ -88,16 +95,22 @@ function feature_best_split(X, target, n_classes, feature)
     return (val = best_val, impurity = best_impurity)
 end
 
-# Chooses best feature from features
-function best_split(X, target, n_classes, features)
+function create_containers(n_classes, y)
     left = zeros(Int, n_classes)
     right = Vector{Int}(undef, n_classes)
-    lt = length(target)
+    lt = length(y)
     for i in 1:lt
-        left[target[i]] += 1
+        left[y[i]] += 1
     end
-    gini_before = node_group_gini_index(left, lt)
+    gini_before = gini_index(left, lt)
     containers = (left = left, right = right, gini_before = gini_before, lt = lt)
+    
+    return containers
+end
+
+# Chooses best feature from features
+function best_split(X, target, n_classes, features)
+    containers = create_containers(n_classes, target)
     best_feature = 0
     best_val = -Inf
     best_impurity = -Inf
@@ -112,7 +125,6 @@ function best_split(X, target, n_classes, features)
 
     return (feature = best_feature, val = best_val)
 end
-
 
 function split_value(X, target, n_classes)
     res = zeros(Int, n_classes)

@@ -1,20 +1,22 @@
 module TestDecisionTree
 using Test
 using StrayCopses
-using StrayCopses: feature_best_split, best_split, Node, DecisionTreeContainer, process_node
+using StrayCopses: feature_best_split, best_split, Node, DecisionTreeContainer, process_node, create_containers
 using StableRNGs
 
 @testset "Basic split" begin
     X = reshape([1., 2., 3., 4.], :, 1)
     y = [1, 1, 2, 2]
 
-    @test feature_best_split(X, y, 2, 1) == (val = 3.000, impurity = 0.5)
+    containers = create_containers(2, y)
+    @test feature_best_split(containers, X, y, 2, 1) == (val = 3.000, impurity = 0.5)
 end
 
 @testset "Best split" begin
     X = collect(reshape([1., 2., 3., 4., 1., 2., 2., 4.], :, 2))
     y = [1, 1, 2, 2]
 
+    containers = create_containers(2, y)
     @test best_split(X, y, 2, 1:2) == (feature = 1, val = 3.0000)
     @test best_split(X, y, 2, 1:1) == (feature = 1, val = 3.0000)
     @test best_split(X, y, 2, [2]) == (feature = 2, val = 2.0000)
