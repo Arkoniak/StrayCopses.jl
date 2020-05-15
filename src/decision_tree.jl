@@ -48,51 +48,83 @@ struct DecisionTreeContainer{T}
     min_node_records::Int
 end
 
-function test_split(X, target, n_classes, feature, value)
-    left = zeros(Int, n_classes)
-    right = zeros(Int, n_classes)
-    for i in axes(X, 1)
+"""
+    test_split
+
+For a given feature and value count number of examples that goes to the left and 
+right branch correspondingly
+"""
+function test_split(containers, X, target, n_classes, feature, value)
+    left = containers.left
+    right = containers.right
+    left .= 0
+    right .= 0
+    @inbounds @simd for i in axes(X, 1)
         if X[i, feature] < value
             left[target[i]] += 1
         else
             right[target[i]] += 1
         end
     end
-
-    return left, right
 end
 
-# find best split for given feature
-function feature_best_split(X, target, n_classes, feature)
+"""
+    feature_best_split
+
+For a given feature search best split value.
+"""
+function feature_best_split(containers, X, target, n_classes, feature)
+    gini_before = containers.gini_before
+    left = containers.left
+    right = containers.right
+    lt = containers.lt
+
     best_val = -Inf
-    best_gini = -Inf
-    for i in axes(X, 1)
-        left, right = test_split(X, target, n_classes, feature, X[i, feature])
-        gini = gini_index([left, right])
-        if gini > best_gini
-            best_gini = gini
+    best_impurity = -Inf
+    @inbounds for i in axes(X, 1)
+        test_split(containers, X, target, n_classes, feature, X[i, feature])
+        ll = sum(left)
+        lr = sum(right)
+        impurity = gini_impurity(gini_before, left, right, ll, lr, lt)
+        if impurity > best_impurity
+            best_impurity = impurity
             best_val = X[i, feature]
         end
     end
 
-    return best_val
+    return (val = best_val, impurity = best_impurity)
+end
+
+function create_containers(n_classes, y)
+    left = zeros(Int, n_classes)
+    right = Vector{Int}(undef, n_classes)
+    lt = length(y)
+    for i in 1:lt
+        left[y[i]] += 1
+    end
+    gini_before = gini_index(left, lt)
+    containers = (left = left, right = right, gini_before = gini_before, lt = lt)
+    
+    return containers
 end
 
 # Chooses best feature from features
 function best_split(X, target, n_classes, features)
+    containers = create_containers(n_classes, target)
     best_feature = 0
     best_val = -Inf
+    best_impurity = -Inf
     for feature in features
-        val = feature_best_split(X, target, n_classes, feature)
-        if val > best_val
+        val, impurity = feature_best_split(containers, X, target, n_classes, feature)
+        if impurity > best_impurity
             best_val = val
             best_feature = feature
+            best_impurity = impurity
         end
     end
 
-    return (best_feature, best_val)
+    return (feature = best_feature, val = best_val)
 end
-
 
 function split_value(X, target, n_classes)
     res = zeros(Int, n_classes)
@@ -115,9 +147,11 @@ end
 # Node functions
 ###############################
 
-function process_node(dtc::DecisionTreeContainer{T}, node, X, target, rng = Random.GLOBAL_RNG,
-        features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false),
-        depth = 1) where T
+function process_node(dtc::DecisionTreeContainer{T}, node, X, target, 
+                      rng = Random.GLOBAL_RNG, 
+                      features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false),
+                      depth = 1) where T
+
     if depth > dtc.max_depth
         node.is_terminal = true
         node.value = split_value(X, target, dtc.n_classes)
@@ -142,7 +176,18 @@ function process_node(dtc::DecisionTreeContainer{T}, node, X, target, rng = Rand
     end
 end
 
-function predict(node::Node{T}, row) where T
+function create_tree(X, y; rng = Random.GLOBAL_RNG, max_depth = 10, min_node_records = 1,
+                     n_features = size(X, 2))
+    T = eltype(X)
+    root = Node{T}()
+    n_classes = length(Set(y))
+    dtc = DecisionTreeContainer(root, n_features, n_classes, max_depth, min_node_records)
+    process_node(dtc, root, X, y, rng)
+    
+    return root
+end
+
+function predict(node::Node, row)
     if node.is_terminal
         return node.value
     else
@@ -150,6 +195,18 @@ function predict(node::Node{T}, row) where T
             return predict(node.left, row)
         else
             return predict(node.right, row)
+        end
+    end
+end
+
+function predict(node::Node, X, i)
+    if node.is_terminal
+        return node.value
+    else
+        if X[i, node.feature_idx] < node.feature_val
+            return predict(node.left, X, i)
+        else
+            return predict(node.right, X, i)
         end
     end
 end
