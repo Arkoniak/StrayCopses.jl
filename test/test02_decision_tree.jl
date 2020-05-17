@@ -10,6 +10,21 @@ using StableRNGs
 
     containers = create_containers(2, y)
     @test feature_best_split(containers, X, y, 2, 1) == (val = 3.000, impurity = 0.5)
+
+    rng = StableRNG(2020)
+    N = 5
+    n_classes = 3
+    X = reshape(rand(rng, 2*N), :, 2)
+    y = rand(rng, 1:n_classes, N)
+    containers = StrayCopses.create_containers(n_classes, y)
+    
+    res = feature_best_split(containers, X, y, n_classes, 1)
+    @test res.val ≈ 0.257183060127947
+    @test res.impurity ≈ 0.2599999999999999
+
+    res = feature_best_split(containers, X, y, n_classes, 2)
+    @test res.val ≈ 0.9442017794271014
+    @test res.impurity ≈ 0.36
 end
 
 @testset "Best split" begin

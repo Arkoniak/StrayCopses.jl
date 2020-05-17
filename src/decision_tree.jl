@@ -49,47 +49,47 @@ struct DecisionTreeContainer{T}
 end
 
 """
-    test_split
-
-For a given feature and value count number of examples that goes to the left and 
-right branch correspondingly
-"""
-function test_split(containers, X, target, n_classes, feature, value)
-    left = containers.left
-    right = containers.right
-    left .= 0
-    right .= 0
-    @inbounds @simd for i in axes(X, 1)
-        if X[i, feature] < value
-            left[target[i]] += 1
-        else
-            right[target[i]] += 1
-        end
-    end
-end
-
-"""
     feature_best_split
 
 For a given feature search best split value.
 """
-function feature_best_split(containers, X, target, n_classes, feature)
+function feature_best_split(containers, X, y, n_classes, feature)
     gini_before = containers.gini_before
     left = containers.left
     right = containers.right
     lt = containers.lt
 
-    best_val = -Inf
-    best_impurity = -Inf
-    @inbounds for i in axes(X, 1)
-        test_split(containers, X, target, n_classes, feature, X[i, feature])
-        ll = sum(left)
-        lr = sum(right)
-        impurity = gini_impurity(gini_before, left, right, ll, lr, lt)
-        if impurity > best_impurity
-            best_impurity = impurity
-            best_val = X[i, feature]
-        end
+    # prepare initial split
+    left .= 0
+    right .= 0
+    for i in axes(X, 1)
+        right[y[i]] += 1
+    end
+    # TODO: I leave it for now. In the future, sorting should be done before feature split,
+    # so allocations or unsafe arrays would be of no importance.
+    sort_idx = sortperm(@view X[:, feature])
+    ll = 1
+    lr = length(y) - 1
+    i1 = sort_idx[1]
+    left[y[i1]] = 1
+    right[y[i1]] -= 1
+    prev_val = X[i1, feature]
+    best_val = prev_val
+    best_impurity = 0.0
+    @inbounds for idx in 2:length(y)
+        i = sort_idx[idx]
+        if X[i, feature] != prev_val
+            prev_val = X[i, feature]
+            impurity = gini_impurity(gini_before, left, right, ll, lr, lt)
+            if impurity > best_impurity
+                best_impurity = impurity
+                best_val = prev_val
+            end
+        end 
+        ll += 1
+        lr -= 1
+        left[y[i]] += 1
+        right[y[i]] -= 1
     end
 
     return (val = best_val, impurity = best_impurity)
