@@ -4,10 +4,6 @@ using StrayCopses
 using StrayCopses: information_gain, information_impurity, gini_index, gini_impurity
 
 @testset "Basic information gain" begin
-    # @test node_group_information_gain([3, 3]) == 1.0
-    # @test node_group_information_gain([2, 6]) ≈ 0.8112781244591328
-    # @test node_information_gain([[3, 3], [2, 6]]) ≈ 0.8921589282623617
-    # @test information_gain([[3, 3], [2, 6]]) ≈ 0.04812703040826927
     @test information_gain([3, 3], 6) == 1.0
     @test information_gain([2, 6], 8) ≈ 0.8112781244591328
     information_before = information_gain([5, 9], 14)
@@ -15,11 +11,6 @@ using StrayCopses: information_gain, information_impurity, gini_index, gini_impu
 end
 
 @testset "Basic gini index" begin
-    # @test node_group_gini_index([4, 2]) ≈ 0.444444444444444444
-    # @test node_group_gini_index([2, 2]) ≈ 0.5
-    # @test node_group_gini_index([2, 0]) ≈ 0
-    # @test node_gini_index([[2, 2], [2, 0]]) ≈ 0.333333333333333333
-    # @test gini_index([[2, 2], [2, 0]]) ≈ 0.111111111111111111111
     @test gini_index([4, 2], 6) ≈ 0.555555555555555555555
     @test gini_index([2, 2], 4) ≈ 0.5
     @test gini_index([2, 0], 2) ≈ 1

@@ -8,4 +8,4 @@
 /docs/site/
 
 .ipynb_checkpoints/
-test/experiments.jl
+test/experiment*.jl
