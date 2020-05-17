@@ -1,7 +1,7 @@
 name = "StrayCopses"
 uuid = "f554f415-119e-4ea0-8d58-ae5601ed402a"
 authors = ["Andrey Oskin"]
-version = "0.1.0"
+version = "0.0.1"
 
 [deps]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
