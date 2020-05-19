@@ -1,47 +1,48 @@
 mutable struct Node{T}
     feature_idx::Int
+    feature_val_idx::UInt32
     feature_val::T
     value::Int
-    left::Node{T}
-    right::Node{T}
+    left::Node
+    right::Node
     is_terminal::Bool
 
-    function Node(feature_idx, feature_val::T) where {T}
+    function Node(feature_idx, feature_val_idx, feature_val::T) where {T}
         node = new{T}()
         node.feature_idx = feature_idx
+        node.feature_val_idx = feature_val_idx
         node.feature_val = feature_val
         node.is_terminal = false
 
         return node
     end
 
-    function Node{T}(value) where {T}
-        node = new{T}()
-        node.value = value
-        node.is_terminal = true
+    # function Node{T}(value) where {T}
+    #     node = new{T}()
+    #     node.value = value
+    #     node.is_terminal = true
 
-        return node
-    end
+    #     return node
+    # end
 
-    function Node(feature_idx, feature_val::T, value, is_terminal=false) where {T}
-        node = new{T}()
-        node.feature_idx = feature_idx
-        node.feature_val = feature_val
-        node.value = value
-        node.is_terminal = is_terminal
+    # function Node(feature_idx, feature_val::T, value, is_terminal=false) where {T}
+    #     node = new{T}()
+    #     node.feature_idx = feature_idx
+    #     node.value = value
+    #     node.feature_val = feature_val
+    #     node.is_terminal = is_terminal
 
-        return node
-    end
+    #     return node
+    # end
 
-    function Node{T}() where T
-        node = new{T}()
-        node.is_terminal = false
-        return node
-    end
+    # function Node{T}() where T
+    #     node = new{T}()
+    #     node.is_terminal = false
+    #     return node
+    # end
 end
 
-struct DecisionTreeContainer{T}
-    root::Node{T}
+struct DecisionTree
     n_features_per_node::Int
     n_classes::Int
     max_depth::Int
@@ -58,28 +59,23 @@ function feature_best_split(containers, X, y, n_classes, feature)
     left = containers.left
     right = containers.right
     lt = containers.lt
+    ids = containers.ids
+    perms = X.perms
+    ranks = X.ranks
 
     # prepare initial split
-    left .= 0
-    right .= 0
-    for i in axes(X, 1)
-        right[y[i]] += 1
-    end
-    # TODO: I leave it for now. In the future, sorting should be done before feature split,
-    # so allocations or unsafe arrays would be of no importance.
-    sort_idx = sortperm(@view X[:, feature])
     ll = 1
     lr = length(y) - 1
-    i1 = sort_idx[1]
+    i1 = X.perms[ids[1], feature]
     left[y[i1]] = 1
     right[y[i1]] -= 1
-    prev_val = X[i1, feature]
+    prev_val = ranks[i1, feature]
     best_val = prev_val
     best_impurity = 0.0
-    @inbounds for idx in 2:length(y)
-        i = sort_idx[idx]
-        if X[i, feature] != prev_val
-            prev_val = X[i, feature]
+    @inbounds for idx in 2:length(ids)
+        i = perms[ids[idx], feature]
+        if ranks[i, feature] != prev_val
+            prev_val = ranks[i, feature]
             impurity = gini_impurity(gini_before, left, right, ll, lr, lt)
             if impurity > best_impurity
                 best_impurity = impurity
@@ -95,27 +91,27 @@ function feature_best_split(containers, X, y, n_classes, feature)
     return (val = best_val, impurity = best_impurity)
 end
 
-function create_containers(n_classes, y)
+function create_containers(n_classes, y, ids)
     left = zeros(Int, n_classes)
-    right = Vector{Int}(undef, n_classes)
-    lt = length(y)
-    for i in 1:lt
-        left[y[i]] += 1
+    right = zeros(Int, n_classes)
+    lt = length(ids)
+    for i in ids
+        right[y[i]] += 1
     end
-    gini_before = gini_index(left, lt)
-    containers = (left = left, right = right, gini_before = gini_before, lt = lt)
-    
+    gini_before = gini_index(right, lt)
+    containers = (left = left, right = right, gini_before = gini_before, lt = lt, ids = ids)
+ 
     return containers
 end
 
 # Chooses best feature from features
-function best_split(X, target, n_classes, features)
-    containers = create_containers(n_classes, target)
+function best_split(X, y, ids, n_classes, features)
+    containers = create_containers(n_classes, y, ids)
     best_feature = 0
     best_val = -Inf
     best_impurity = -Inf
     for feature in features
-        val, impurity = feature_best_split(containers, X, target, n_classes, feature)
+        val, impurity = feature_best_split(containers, X, y, n_classes, feature)
         if impurity > best_impurity
             best_val = val
             best_feature = feature
@@ -147,42 +143,97 @@ end
 # Node functions
 ###############################
 
-function process_node(dtc::DecisionTreeContainer{T}, node, X, target, 
-                      rng = Random.GLOBAL_RNG, 
-                      features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false),
-                      depth = 1) where T
+function build_node(X, y, n_classes, n_features_per_node,
+                   rng = Random.GLOBAL_RNG,
+                    ids = axes(X, 1),
+                   features = sample(rng, 1:size(X, 2), n_features_per_node, replace = false))
+    # Ok, this one is type stable, since we always return indices of corresponding values
+    feature_idx, feature_val_idx = best_split(X, y, ids, n_classes, features)
+    feature_val = X.X[feature_val_idx, feature_idx]
 
-    if depth > dtc.max_depth
+    root = Node(feature_idx, feature_val_idx, feature_val)
+    return root
+
+function process_node(dt::DecisionTree, node, X, target, ids,
+                      rng = Random.GLOBAL_RNG, 
+                      depth = 1)
+
+    if depth > dt.max_depth
         node.is_terminal = true
-        node.value = split_value(X, target, dtc.n_classes)
-    elseif length(target) <= dtc.min_node_records
+        node.value = split_value(X, target, ids, dt.n_classes)
+    elseif length(ids) <= dtc.min_node_records
         node.is_terminal = true
-        node.value = split_value(X, target, dtc.n_classes)
-    elseif is_pure(target)
+        node.value = split_value(X, target, ids, dt.n_classes)
+    elseif is_pure(target, ids)
         node.is_terminal = true
-        node.value = target[1]
+        node.value = target[ids[1]]
     else
-        feature_idx, feature_val = best_split(X, target, dtc.n_classes, features)
-        node.feature_idx = feature_idx
-        node.feature_val = feature_val
-        left_ids, right_ids = get_split_indices(X, feature_idx, feature_val)
-        left = Node{T}()
-        right = Node{T}()
-        node.left = left
-        node.right = right
-        new_features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false)
-        process_node(dtc, left, X[left_ids, :], target[left_ids], rng, new_features, depth + 1)
-        process_node(dtc, right, X[right_ids, :], target[right_ids], rng, new_features, depth + 1)
+        # feature_idx, feature_val = best_split(X, target, dt.n_classes, features)
+        # node.feature_idx = feature_idx
+        # node.feature_val = feature_val
+        left_ids, right_ids = get_split_indices(X, node.feature_idx, node.feature_val_idx, ids)
+
+        # process left node
+        node.left = build_node(X, y, n_classes, dt.n_features_per_node, rng, left_ids)
+        node.right = build_node(X, y, n_classes, dt.n_features_per_node, rng, right_ids)
+        process_node(dt, node.left, X, y, left_ids, rng, depth + 1)
+        process_node(dt, node.right, X, y, right_ids, rng, depth + 1)
     end
+    # new_features = sample(rng, 1:size(X, 2), dt.n_features_per_node, replace = false)
+    # feature_idx, feature_val_idx = best_split(X, y, n_classes, new_features, left_ids)
+    # feature_val = X.X[feature_val_idx, feature_idx]
+    # left = Node(feature_idx, feature_val_idx, feature_val)
+
+    # process right node
+    # new_features = sample(rng, 1:size(X, 2), dt.n_features_per_node, replace = false)
+    # feature_idx, feature_val_idx = best_split(X, y, n_classes, new_features, right_ids)
+    # feature_val = X.X[feature_val_idx, feature_idx]
+    # right = Node(feature_idx, feature_val_idx, feature_val)
+
+    # node.left = left
+    # node.right = right
+
+    # left = process_node(dt, )
+    # left = Node{T}()
+    # right = Node{T}()
+    # node.left = left
+    # node.right = right
+    # new_features = sample(rng, 1:size(X, 2), dt.n_features_per_node, replace = false)
+    # process_node(dt, left, X[left_ids, :], target[left_ids], rng, new_features, depth + 1)
+    # process_node(dt, right, X[right_ids, :], target[right_ids], rng, new_features, depth + 1)
+
+    # if depth > dtc.max_depth
+    #     node.is_terminal = true
+    #     node.value = split_value(X, target, dtc.n_classes)
+    # elseif length(target) <= dtc.min_node_records
+    #     node.is_terminal = true
+    #     node.value = split_value(X, target, dtc.n_classes)
+    # elseif is_pure(target)
+    #     node.is_terminal = true
+    #     node.value = target[1]
+    # else
+        # feature_idx, feature_val = best_split(X, target, dtc.n_classes, features)
+        # node.feature_idx = feature_idx
+        # node.feature_val = feature_val
+        # left_ids, right_ids = get_split_indices(X, feature_idx, feature_val)
+        # left = Node{T}()
+        # right = Node{T}()
+        # node.left = left
+        # node.right = right
+        # new_features = sample(rng, 1:size(X, 2), dtc.n_features_per_node, replace = false)
+        # process_node(dtc, left, X[left_ids, :], target[left_ids], rng, new_features, depth + 1)
+        # process_node(dtc, right, X[right_ids, :], target[right_ids], rng, new_features, depth + 1)
 end
 
-function create_tree(X, y; rng = Random.GLOBAL_RNG, max_depth = 10, min_node_records = 1,
-                     n_features = size(X, 2))
+function create_tree(X, y; rng = Random.GLOBAL_RNG, max_depth = typemax(Int),
+                     min_node_records = 1, n_features = size(X, 2))
     T = eltype(X)
-    root = Node{T}()
     n_classes = length(Set(y))
-    dtc = DecisionTreeContainer(root, n_features, n_classes, max_depth, min_node_records)
-    process_node(dtc, root, X, y, rng)
+    prm = PRMatrix(X)
+    root = init_tree(prm, y, n_classes, n_features, rng)
+    dt = DecisionTree(n_features, n_classes, max_depth, min_node_records)
+
+    process_node(root, dt, prm, y, rng)
     
     return root
 end

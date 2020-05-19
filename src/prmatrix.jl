@@ -28,7 +28,8 @@ struct PRMatrix{T}
     modes::Vector{UInt8}
 end
 
-function PRMatrix(X::T) where T
+PRMatrix(X::PRMatrix) = X
+function PRMatrix(X)
     nrow, ncol = size(X)
     perms = Matrix{UInt32}(undef, nrow, ncol)
     ranks = Matrix{UInt32}(undef, nrow, ncol)
